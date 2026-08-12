@@ -186,6 +186,7 @@ public class Installer {
         params.add("logcatformat=" + settings.LOGCAT_FORMAT.get());
         if (!settings.LOGCAT_COLORS.get()) params.add("logcatnocolors");
         params.add("dmesg=" + ((settings.DMESG.get() && (boot || !haveLogcat)) ? Settings.DMESG_ALL : Settings.DMESG_NONE));
+        if (!settings.DMESG_COLORS.get()) params.add("dmesgnocolors");
         params.add("lines=" + settings.LINES.get());
         if (settings.WORD_WRAP.get()) params.add("wordwrap");
         if (settings.SAVE_LOGS.get() && boot) params.add("save");

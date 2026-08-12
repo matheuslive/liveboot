@@ -208,6 +208,8 @@ public class Settings {
     public static final String DMESG_NONE                      = "0--1";
     public BooleanSetting      DMESG                           = new BooleanSetting(this, "dmesg", true);
 
+    public BooleanSetting      DMESG_COLORS                    = new BooleanSetting(this, "dmesg_colors", true);
+
     public StringSetting       LINES                           = new StringSetting(this, "lines", "80");
     public BooleanSetting      WORD_WRAP                       = new BooleanSetting(this, "word_wrap", true);
 

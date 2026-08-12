@@ -550,7 +550,8 @@ public class SettingsFragment extends PreferenceFragment implements OnSharedPref
         Pref.Check(activity, catLogcat, R.string.settings_logcat_colors_title, R.string.settings_logcat_colors_description, settings.LOGCAT_COLORS.name, settings.LOGCAT_COLORS.defaultValue);        
 
         PreferenceCategory catDmesg = Pref.Category(activity, root, R.string.settings_category_dmesg);
-        Pref.Check(activity, catDmesg, R.string.settings_dmesg_title, R.string.settings_dmesg_description, settings.DMESG.name, settings.DMESG.defaultValue);        
+        Pref.Check(activity, catDmesg, R.string.settings_dmesg_title, R.string.settings_dmesg_description, settings.DMESG.name, settings.DMESG.defaultValue);
+        Pref.Check(activity, catDmesg, R.string.settings_dmesg_colors_title, R.string.settings_dmesg_colors_description, settings.DMESG_COLORS.name, settings.DMESG_COLORS.defaultValue);
 
         PreferenceCategory catOptions = Pref.Category(activity, root, R.string.settings_category_settings);
         

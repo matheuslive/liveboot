@@ -31,6 +31,30 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Dmesg {
     private static final int COLOR = Color.WHITE;
 
+    /* Colors per kernel log level (syslog severity), following the same scheme
+     * logcat uses: errors red, warnings yellow, debug blue. INFO is kept white
+     * rather than green, as it makes up the bulk of kernel output - coloring it
+     * would drown out the levels that actually need to stand out.
+     *
+     * 0 EMERG, 1 ALERT, 2 CRIT, 3 ERR, 4 WARNING, 5 NOTICE, 6 INFO, 7 DEBUG */
+    public static final int[] LEVEL_COLORS = new int[] {
+        /* EMERG    */ Color.RED,
+        /* ALERT    */ Color.RED,
+        /* CRIT     */ Color.RED,
+        /* ERR      */ Color.RED,
+        /* WARNING  */ Color.YELLOW,
+        /* NOTICE   */ Color.GREEN,
+        /* INFO     */ Color.WHITE,
+        /* DEBUG    */ Color.rgb(0x40, 0x80, 0xFF)
+    };
+
+    /* /dev/kmsg (and /proc/kmsg) prefix the priority, which is
+     * (facility << 3) | level - mask out the facility to get the level */
+    private static int levelToColor(int level) {
+        if (level < 0) return COLOR;
+        return LEVEL_COLORS[level & 7];
+    }
+
     private volatile int mShowMin = 0;
     private volatile int mShowMax = 99;
     
@@ -124,7 +148,8 @@ public class Dmesg {
     private void processLine(String line) {
         if (line.length() > 0) {
             String processed = null;
-            
+            int color = COLOR;
+
             if (line.startsWith("<")) {
                 // /proc/kmsg
                 int p = line.indexOf('>');
@@ -136,6 +161,7 @@ public class Dmesg {
                     }
                     if ((level >= mShowMin) && (level <= mShowMax)) {
                         processed = line;
+                        color = levelToColor(level);
                     }
                 }
             } else {
@@ -152,6 +178,7 @@ public class Dmesg {
                                 String time1 = time.substring(0, time.length() - 6);
                                 String time2 = time.substring(time.length() - 6);
                                 processed = String.format(Locale.ENGLISH, "<%d>[%s.%6s] %s", level, time1, time2, content);
+                                color = levelToColor(level);
                             }
                         } catch (NumberFormatException e) {                                        
                         }
@@ -160,7 +187,7 @@ public class Dmesg {
             }
             
             if (processed != null) {
-                mOnLineListener.onLine(this, processed, COLOR);
+                mOnLineListener.onLine(this, processed, color);
             }
         }
     }

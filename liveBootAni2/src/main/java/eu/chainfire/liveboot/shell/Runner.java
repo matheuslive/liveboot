@@ -87,6 +87,7 @@ implements
     private boolean mTransparent = false;
     private boolean mDark = false;
     private boolean mLogcatColor = true;
+    private boolean mDmesgColor = true;
     private static final String LOG_NAME = "/cache/liveboot.log";
     private boolean mLogSave = false;
     private OutputStream mLogStream = null;
@@ -211,6 +212,9 @@ implements
                 } else if (arg.equals("logcatnocolors")) {
                     mLogcatColor = false;
                     Logger.dp("OPTS", "logcatnocolors==1");
+                } else if (arg.equals("dmesgnocolors")) {
+                    mDmesgColor = false;
+                    Logger.dp("OPTS", "dmesgnocolors==1");
                 } else if (arg.contains("=")) {
                     String key = arg.substring(0, arg.indexOf('='));
                     String value = arg.substring(arg.indexOf('=') + 1);
@@ -348,6 +352,7 @@ implements
                     if (mComplete == 0) {
                         int color = c;
                         if ((s == mLogcat) && (!mLogcatColor)) color = Color.WHITE;
+                        if ((s == mDmesg) && (!mDmesgColor)) color = Color.WHITE;
                         mTextManager.add(t, color, mWordWrap);
                     } else {
                         mTextManager.add("", Color.WHITE, mWordWrap);
