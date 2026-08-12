@@ -32,8 +32,8 @@ import eu.chainfire.librootjava.Logger;
 import eu.chainfire.libcfsurface.SurfaceHost;
 import eu.chainfire.libcfsurface.gl.GLHelper;
 import eu.chainfire.libcfsurface.gl.GLPicture;
-import eu.chainfire.libcfsurface.gl.GLTextManager;
 import eu.chainfire.libcfsurface.gl.GLTextureManager;
+import eu.chainfire.liveboot.gl.SpanTextManager;
 import eu.chainfire.librootjavadaemon.RootDaemon;
 import eu.chainfire.libsuperuser.Debug;
 import eu.chainfire.libsuperuser.Shell;
@@ -88,6 +88,7 @@ implements
     private boolean mDark = false;
     private boolean mLogcatColor = true;
     private boolean mDmesgColor = true;
+    private boolean mDmesgTimestamps = true;
     private static final String LOG_NAME = "/cache/liveboot.log";
     private boolean mLogSave = false;
     private OutputStream mLogStream = null;
@@ -100,7 +101,7 @@ implements
     
     private GLTextureManager mTextureManager = null;
     private GLHelper mHelper = null;
-    private volatile GLTextManager mTextManager = null;
+    private volatile SpanTextManager mTextManager = null;
         
     private Logcat mLogcat = null;
     private Dmesg mDmesg = null;  
@@ -215,6 +216,9 @@ implements
                 } else if (arg.equals("dmesgnocolors")) {
                     mDmesgColor = false;
                     Logger.dp("OPTS", "dmesgnocolors==1");
+                } else if (arg.equals("dmesgnotimestamps")) {
+                    mDmesgTimestamps = false;
+                    Logger.dp("OPTS", "dmesgnotimestamps==1");
                 } else if (arg.contains("=")) {
                     String key = arg.substring(0, arg.indexOf('='));
                     String value = arg.substring(arg.indexOf('=') + 1);
@@ -269,7 +273,7 @@ implements
         // start logcat and dmesg
         if (mRunScript == null) {
             mLogcat = new Logcat(this, mLines * 4, logcatLevelOpts, logcatBufferOpts, logcatFormatOpt, mHandler);
-            mDmesg = new Dmesg(this, mLines * 4, dmesgOpts, mHandler);
+            mDmesg = new Dmesg(this, mLines * 4, dmesgOpts, mDmesgColor, mDmesgTimestamps, mHandler);
         }
     }
 
@@ -285,7 +289,7 @@ implements
     protected void onInitRender() {
         mTextureManager = new GLTextureManager();
         mHelper = new GLHelper(mWidth, mHeight, GLHelper.getDefaultVMatrix());
-        mTextManager = new GLTextManager(mTextureManager, mHelper, mWidth, mHeight, mHeight / mLines);
+        mTextManager = new SpanTextManager(mTextureManager, mHelper, mWidth, mHeight, mHeight / mLines);
 
         GLPicture.initGl();            
                 
@@ -328,10 +332,16 @@ implements
 
     @Override
     public void onLine(Object sender, String text, int color) {
+        onLine(sender, text, color, null);
+    }
+
+    @Override
+    public void onLine(Object sender, String text, int color, ColorSpan[] spans) {
         final String t = text;
         final int c = color;
         final Object s = sender;
-        mHandler.post(new Runnable() {           
+        final ColorSpan[] sp = spans;
+        mHandler.post(new Runnable() {
             @Override
             public void run() {
                 if (mTextManager != null) {
@@ -352,8 +362,7 @@ implements
                     if (mComplete == 0) {
                         int color = c;
                         if ((s == mLogcat) && (!mLogcatColor)) color = Color.WHITE;
-                        if ((s == mDmesg) && (!mDmesgColor)) color = Color.WHITE;
-                        mTextManager.add(t, color, mWordWrap);
+                        mTextManager.add(t, color, mWordWrap, sp);
                     } else {
                         mTextManager.add("", Color.WHITE, mWordWrap);
                     }

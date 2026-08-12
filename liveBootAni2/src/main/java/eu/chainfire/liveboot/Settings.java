@@ -209,6 +209,7 @@ public class Settings {
     public BooleanSetting      DMESG                           = new BooleanSetting(this, "dmesg", true);
 
     public BooleanSetting      DMESG_COLORS                    = new BooleanSetting(this, "dmesg_colors", true);
+    public BooleanSetting      DMESG_TIMESTAMPS                = new BooleanSetting(this, "dmesg_timestamps", true);
 
     public StringSetting       LINES                           = new StringSetting(this, "lines", "80");
     public BooleanSetting      WORD_WRAP                       = new BooleanSetting(this, "word_wrap", true);

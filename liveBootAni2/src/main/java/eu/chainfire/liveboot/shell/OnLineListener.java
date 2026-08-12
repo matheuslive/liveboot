@@ -18,5 +18,7 @@ package eu.chainfire.liveboot.shell;
 
 public interface OnLineListener {
     public void onLine(Object sender, String text, int color);
+    /** As onLine, but coloring individual runs of the line; spans may be null */
+    public void onLine(Object sender, String text, int color, ColorSpan[] spans);
     public void onLog(Object sender, String text);
 }

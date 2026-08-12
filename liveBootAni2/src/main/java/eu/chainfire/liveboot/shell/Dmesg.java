@@ -25,42 +25,20 @@ import eu.chainfire.libsuperuser.Shell;
 import eu.chainfire.libsuperuser.StreamGobbler;
 
 import java.util.LinkedList;
-import java.util.Locale;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Dmesg {
     private static final int COLOR = Color.WHITE;
 
-    /* Colors per kernel log level (syslog severity), following the same scheme
-     * logcat uses: errors red, warnings yellow, debug blue. INFO is kept white
-     * rather than green, as it makes up the bulk of kernel output - coloring it
-     * would drown out the levels that actually need to stand out.
-     *
-     * 0 EMERG, 1 ALERT, 2 CRIT, 3 ERR, 4 WARNING, 5 NOTICE, 6 INFO, 7 DEBUG */
-    public static final int[] LEVEL_COLORS = new int[] {
-        /* EMERG    */ Color.RED,
-        /* ALERT    */ Color.RED,
-        /* CRIT     */ Color.RED,
-        /* ERR      */ Color.RED,
-        /* WARNING  */ Color.YELLOW,
-        /* NOTICE   */ Color.GREEN,
-        /* INFO     */ Color.WHITE,
-        /* DEBUG    */ Color.rgb(0x40, 0x80, 0xFF)
-    };
-
-    /* /dev/kmsg (and /proc/kmsg) prefix the priority, which is
-     * (facility << 3) | level - mask out the facility to get the level */
-    private static int levelToColor(int level) {
-        if (level < 0) return COLOR;
-        return LEVEL_COLORS[level & 7];
-    }
-
     private volatile int mShowMin = 0;
     private volatile int mShowMax = 99;
-    
+
+    private final boolean mColors;
+    private final boolean mTimestamps;
+
     private final Shell.Interactive mShell;
     private final OnLineListener mOnLineListener;
-    
+
     private volatile long mLineLast = 0;
     private volatile boolean mLinePassthrough = false;
     private final LinkedList<String> mCache = new LinkedList<String>();
@@ -69,7 +47,10 @@ public class Dmesg {
         
     private final ReentrantLock mLock = new ReentrantLock(true);
 
-    public Dmesg(OnLineListener onLineListener, int cacheSize, String show, Handler handler) {
+    public Dmesg(OnLineListener onLineListener, int cacheSize, String show, boolean colors, boolean timestamps, Handler handler) {
+        mColors = colors;
+        mTimestamps = timestamps;
+
         if (show != null) {
             int p = show.indexOf('-');
             if (p > -1) {
@@ -147,49 +128,66 @@ public class Dmesg {
     
     private void processLine(String line) {
         if (line.length() > 0) {
-            String processed = null;
-            int color = COLOR;
+            DmesgFormat.Record record = null;
 
             if (line.startsWith("<")) {
-                // /proc/kmsg
+                // /proc/kmsg: "<prio>[   12.345678] message", the timestamp
+                // being absent on kernels built without CONFIG_PRINTK_TIME
                 int p = line.indexOf('>');
                 if (p > -1) {
-                    int level = -1;
+                    int priority = -1;
                     try {
-                        level = Integer.valueOf(line.substring(1, p), 10);
-                    } catch (Exception e) {                        
+                        priority = Integer.valueOf(line.substring(1, p), 10);
+                    } catch (Exception e) {
                     }
-                    if ((level >= mShowMin) && (level <= mShowMax)) {
-                        processed = line;
-                        color = levelToColor(level);
+                    if ((priority >= mShowMin) && (priority <= mShowMax)) {
+                        String rest = line.substring(p + 1);
+                        String timestamp = null;
+                        if (rest.startsWith("[")) {
+                            int close = rest.indexOf(']');
+                            if (close > -1) {
+                                timestamp = rest.substring(0, close + 1) + " ";
+                                rest = rest.substring(close + 1);
+                                if (rest.startsWith(" ")) rest = rest.substring(1);
+                            }
+                        }
+                        record = DmesgFormat.format(level(priority), mTimestamps ? timestamp : null, rest, mColors);
                     }
                 }
             } else {
-                // /dev/kmsg
+                // /dev/kmsg: "prio,seq,timestamp_us,flag[,key=value...];message"
                 int p = line.indexOf(';');
                 if (p > -1) {
-                    String content = line.substring(p + 1);
-                    String[] flags = line.split(",");
+                    String content = DmesgFormat.unescape(line.substring(p + 1));
+                    String[] flags = line.substring(0, p).split(",");
                     if ((flags != null) && (flags.length >= 3)) {
                         try {
-                            int level = Integer.valueOf(flags[0], 10);
-                            if ((level >= mShowMin) && (level <= mShowMax)) {
-                                String time = flags[2];
-                                String time1 = time.substring(0, time.length() - 6);
-                                String time2 = time.substring(time.length() - 6);
-                                processed = String.format(Locale.ENGLISH, "<%d>[%s.%6s] %s", level, time1, time2, content);
-                                color = levelToColor(level);
+                            int priority = Integer.valueOf(flags[0], 10);
+                            if ((priority >= mShowMin) && (priority <= mShowMax)) {
+                                String timestamp = null;
+                                if (mTimestamps) {
+                                    timestamp = DmesgFormat.formatTimestamp(Long.valueOf(flags[2], 10));
+                                }
+                                record = DmesgFormat.format(level(priority), timestamp, content, mColors);
                             }
-                        } catch (NumberFormatException e) {                                        
+                        } catch (NumberFormatException e) {
                         }
-                    }                                
+                    }
                 }
             }
-            
-            if (processed != null) {
-                mOnLineListener.onLine(this, processed, color);
+
+            if (record != null) {
+                mOnLineListener.onLine(this, record.text, COLOR, record.spans);
             }
         }
+    }
+
+    /* The priority field is (facility << 3) | level, so mask out the facility.
+     * Userspace writes to /dev/kmsg carry facility 1 and would otherwise be
+     * mistaken for levels 8-15. */
+    private static int level(int priority) {
+        if (priority < 0) return -1;
+        return priority & 7;
     }
     
     public void setReady() {

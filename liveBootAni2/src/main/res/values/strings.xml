@@ -53,7 +53,9 @@
     <string name="settings_dmesg_title">Enable</string>
     <string name="settings_dmesg_description">Display kernel message log</string>
     <string name="settings_dmesg_colors_title">Colors</string>
-    <string name="settings_dmesg_colors_description">Color code dmesg output by kernel log level</string>
+    <string name="settings_dmesg_colors_description">Color code dmesg output like the dmesg command does</string>
+    <string name="settings_dmesg_timestamps_title">Timestamps</string>
+    <string name="settings_dmesg_timestamps_description">Prefix each line with the kernel timestamp</string>
     
     <string name="settings_category_settings">Options</string>
     <string name="settings_transparent_title">Transparent</string>
