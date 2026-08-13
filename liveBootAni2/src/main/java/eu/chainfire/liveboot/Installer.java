@@ -42,7 +42,7 @@ import eu.chainfire.liveboot.shell.Runner;
 public class Installer {
     public enum Mode { SU_D, INIT_D, SU_SU_D, SBIN_SU_D, MAGISK_CORE, MAGISK_ADB, KERNELSU }
     
-    private static final int LAST_SCRIPT_UPDATE = 188;
+    private static final int LAST_SCRIPT_UPDATE = 193;
     private static final String[] SYSTEM_SCRIPTS_SU_D = new String[] { "/system/su.d/0000liveboot" };
     private static final String[] SYSTEM_SCRIPTS_INIT_D = new String[] { "/system/etc/init.d/0000liveboot" };
     private static final String[] SYSTEM_SCRIPTS_SU_SU_D = new String[] { "/su/su.d/0000liveboot" };
@@ -280,6 +280,37 @@ public class Installer {
         Shell.SU.run(commands);
     }
         
+    /**
+     * Writes the boot script Magisk and KernelSU run, which waits for our data
+     * directory to show up and then launches the runner.
+     *
+     * Both post-fs-data.d and service.d get one, and dropping either costs
+     * something: post-fs-data.d fires early enough to catch the start of the
+     * boot, while service.d still works when the early attempt cannot draw yet.
+     * They would however both launch a runner and the two draw over each other,
+     * so each script bails out when the pid file the runner writes points at a
+     * live process. A runner that died leaves a stale pid whose /proc entry is
+     * gone, and the later script takes over as it used to.
+     */
+    private static void addBootScript(List<String> commands, String script, String shell, String filesDir) {
+        commands.add(String.format(Locale.ENGLISH, "echo '#!%s' > %s", shell, script));
+        commands.add(String.format(Locale.ENGLISH, "echo '{' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    while (true); do' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '        if [ -d \"%s\" ]; then' >> %s", filesDir, script));
+        commands.add(String.format(Locale.ENGLISH, "echo '            break;' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '        fi' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '        sleep 0.1' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    done' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    pid=$(cat %s 2>/dev/null)' >> %s", Runner.LIVEBOOT_PID_FILE, script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    if [ -n \"$pid\" ] && [ -d /proc/$pid ]; then' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '        exit 0' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    fi' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, "echo '    %s %s/liveboot' >> %s", shell, filesDir, script));
+        commands.add(String.format(Locale.ENGLISH, "echo '} &' >> %s", script));
+        commands.add(String.format(Locale.ENGLISH, Toolbox.command("chown") + " 0.0 %s", script));
+        commands.add(String.format(Locale.ENGLISH, Toolbox.command("chmod") + " 0700 %s", script));
+    }
+
     public static void install(Context context, Mode mode) {
         Settings settings = Settings.getInstance(context);
         
@@ -340,36 +371,14 @@ public class Installer {
             }
         } else if ((mode == Mode.MAGISK_CORE) || (mode == Mode.MAGISK_ADB)) {
             for (String script : (mode == Mode.MAGISK_CORE) ? SYSTEM_SCRIPTS_MAGISK_CORE : SYSTEM_SCRIPTS_MAGISK_ADB) {
-                commands.add(String.format(Locale.ENGLISH, "echo '#!%s' > %s", shell, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '{' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    while (true); do' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        if [ -d \"%s\" ]; then' >> %s", filesDir, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '            break;' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        fi' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        sleep 0.1' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    done' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    %s %s/liveboot' >> %s", shell, filesDir, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '} &' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, Toolbox.command("chown") + " 0.0 %s", script));
-                commands.add(String.format(Locale.ENGLISH, Toolbox.command("chmod") + " 0700 %s", script));
+                addBootScript(commands, script, shell, filesDir);
             }
         } else if (mode == Mode.KERNELSU) {
             commands.add(Toolbox.command("mkdir") + " /data/adb/post-fs-data.d");
             commands.add(Toolbox.command("chown") + " 0.0 /data/adb/post-fs-data.d");
             commands.add(Toolbox.command("chmod") + " 0755 /data/adb/post-fs-data.d");
             for (String script : SYSTEM_SCRIPTS_KERNELSU) {
-                commands.add(String.format(Locale.ENGLISH, "echo '#!%s' > %s", shell, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '{' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    while (true); do' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        if [ -d \"%s\" ]; then' >> %s", filesDir, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '            break;' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        fi' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '        sleep 0.1' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    done' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, "echo '    %s %s/liveboot' >> %s", shell, filesDir, script));
-                commands.add(String.format(Locale.ENGLISH, "echo '} &' >> %s", script));
-                commands.add(String.format(Locale.ENGLISH, Toolbox.command("chown") + " 0.0 %s", script));
-                commands.add(String.format(Locale.ENGLISH, Toolbox.command("chmod") + " 0700 %s", script));
+                addBootScript(commands, script, shell, filesDir);
             }
         }
         if ((mode == Mode.SU_D) || (mode == Mode.INIT_D)) {

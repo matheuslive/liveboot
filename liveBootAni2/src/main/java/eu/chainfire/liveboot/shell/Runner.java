@@ -74,6 +74,8 @@ implements
     }
     
     public static final String LIVEBOOT_ABORT_FILE = "/dev/.liveboot_exit";
+    /** Our pid, so the boot scripts can tell whether a runner is already up */
+    public static final String LIVEBOOT_PID_FILE = "/dev/.liveboot_pid";
     
     private static final int TEST_TIME = 5000;
     private static final int LEAD_TIME = 200;
@@ -163,6 +165,27 @@ implements
         }                
     }
     
+    /* Written after daemonizing, so it holds the pid that stays around */
+    private void writePidFile() {
+        try {
+            OutputStream os = new FileOutputStream(LIVEBOOT_PID_FILE, false);
+            try {
+                os.write(String.valueOf(android.os.Process.myPid()).getBytes());
+            } finally {
+                os.close();
+            }
+        } catch (Exception e) {
+            Logger.ex(e);
+        }
+    }
+
+    private void removePidFile() {
+        try {
+            (new File(LIVEBOOT_PID_FILE)).delete();
+        } catch (Exception e) {
+        }
+    }
+
     private void suicide() { // self
         Shell.SH.run(new String[] { "/system/bin/" + Toolbox.command("kill") + " -9 " + String.valueOf(android.os.Process.myPid()) });
     }
@@ -184,6 +207,8 @@ implements
     @Override
     protected void onInit(String[] args) {
         RootDaemon.daemonize(BuildConfig.APPLICATION_ID, 0, false, null);
+
+        writePidFile();
 
         Toolbox.init();
 
@@ -279,6 +304,7 @@ implements
 
     @Override
     protected void onDone() {
+        removePidFile();
         mHandlerThread.quit();
         if (mLogcat != null) mLogcat.destroy();
         if (mDmesg != null) mDmesg.destroy();
@@ -494,6 +520,7 @@ implements
             }
         }
         killBootAnimation();
+        removePidFile();
         infanticide();
         suicide();
     }
